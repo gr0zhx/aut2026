@@ -51,7 +51,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Screenshot-${{ matrix.browser }}
-          path: screenshot.png
+          path: ss.png
 
       - name: Stop AUT
         run: docker stop docker-apache
