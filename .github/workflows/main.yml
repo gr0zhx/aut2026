@@ -7,9 +7,12 @@ on:
 
 jobs:
   test:
-    name: Functional Test
-    permissions: write-all
+    name: Functional Test (${{ matrix.browser }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        browser: [firefox, chrome, edge]
+
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
@@ -21,37 +24,29 @@ jobs:
         run: docker build -t my-php-site:latest .
 
       - name: Run AUT
-        run: docker run --network=isolated -p 80:80 --name docker-apache -t -d my-php-site:latest
+        run: docker run --network=isolated -p 80:80 --name docker-apache -d my-php-site:latest
 
-      - name: Get AUT URL
+      - name: Start Selenium (${{ matrix.browser }})
         run: |
-          URL=http://$(ip -f inet -o addr show docker0 | awk '{print $4}' | cut -d '/' -f 1)
-          echo "URL=$URL" >> $GITHUB_ENV
-
-      - name: Check AUT Url
-        run: curl ${{ env.URL }}
-
-      - name: Selenium Preparation
-        run: docker run --network=isolated -d -p 4444:4444 -p 7900:7900 -v /dev/shm:/dev/shm --name firefox-standalone selenium/standalone-firefox:latest
+          if [ "${{ matrix.browser }}" = "firefox" ]; then
+            docker run --network=isolated -d -p 4444:4444 --name selenium selenium/standalone-firefox
+          elif [ "${{ matrix.browser }}" = "chrome" ]; then
+            docker run --network=isolated -d -p 4444:4444 --name selenium selenium/standalone-chrome
+          else
+            docker run --network=isolated -d -p 4444:4444 --name selenium selenium/standalone-edge
+          fi
 
       - name: Wait for Selenium Hub
         run: sh wait.sh
-
-      - name: Check the Hub
-        run: curl http://localhost:4444/ui
 
       - name: Install Selenium client
         run: pip install -U selenium
 
       - name: Run test
-        run: python tests/hello_aut.py ${{ env.URL }}
-      
-      - name: 'Upload Artefact'
+        run: python tests/hello_aut.py http://localhost
+
+      - name: Upload Artefact
         uses: actions/upload-artifact@v4
         with:
-            name: screenshot
-            path: ss.png
- 
-
-      - name: stop docker
-        run: docker stop docker-apache
+          name: screenshot-${{ matrix.browser }}
+          path: ss.png
