@@ -9,7 +9,9 @@ jobs:
   test:
     name: Functional Test (${{ matrix.browser }})
     runs-on: ubuntu-latest
+    permissions: write-all
     strategy:
+      fail-fast: false
       matrix:
         browser: [firefox, chrome, edge]
 
@@ -29,24 +31,27 @@ jobs:
       - name: Start Selenium (${{ matrix.browser }})
         run: |
           if [ "${{ matrix.browser }}" = "firefox" ]; then
-            docker run --network=isolated -d -p 4444:4444 --name selenium selenium/standalone-firefox
+            docker run --network=isolated -d -p 4444:4444 -p 7900:7900 -v /dev/shm:/dev/shm --name selenium selenium/standalone-firefox:latest
           elif [ "${{ matrix.browser }}" = "chrome" ]; then
-            docker run --network=isolated -d -p 4444:4444 --name selenium selenium/standalone-chrome
+            docker run --network=isolated -d -p 4444:4444 -p 7900:7900 -v /dev/shm:/dev/shm --name selenium selenium/standalone-chrome:latest
           else
-            docker run --network=isolated -d -p 4444:4444 --name selenium selenium/standalone-edge
+            docker run --network=isolated -d -p 4444:4444 -p 7900:7900 -v /dev/shm:/dev/shm --name selenium selenium/standalone-edge:latest
           fi
 
       - name: Wait for Selenium Hub
         run: sh wait.sh
 
-      - name: Install Selenium client
+      - name: Install Selenium Client
         run: pip install -U selenium
 
       - name: Run test
-        run: python tests/hello_aut.py http://localhost
+        run: python tests/hello_aut.py http://docker-apache ${{ matrix.browser }}
 
-      - name: Upload Artefact
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: screenshot-${{ matrix.browser }}
-          path: ss.png
+          name: Screenshot-${{ matrix.browser }}
+          path: screenshot.png
+
+      - name: Stop AUT
+        run: docker stop docker-apache
